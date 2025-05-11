@@ -839,12 +839,74 @@
         const maxPriceMatch = !maxPrice || (property.price && parseInt(property.price) <= parseInt(maxPrice));
         const statusMatch = !status || property.status === status;
         
-        // すべての条件に一致する場合のみtrue
-        return typeMatch && cityMatch && addressMatch && minPriceMatch && maxPriceMatch && statusMatch;
-      });
-      
-      renderPropertyTable();
-    };
+       // 物件検索
+document.getElementById('searchBtn').onclick = function() {
+  // 検索条件を取得
+  const type = document.getElementById('searchType').value;
+  const city = document.getElementById('searchCity').value;
+  const address = document.getElementById('searchAddress').value.toLowerCase();
+  const minPrice = document.getElementById('searchMinPrice').value;
+  const maxPrice = document.getElementById('searchMaxPrice').value;
+  const status = document.getElementById('searchStatus').value;
+  
+  // デバッグ用にコンソールに検索条件を出力
+  console.log('検索条件:', { type, city, address, minPrice, maxPrice, status });
+  console.log('検索前の全物件数:', properties.length);
+  
+  // フィルタリング処理
+  filteredProperties = properties.filter(property => {
+    // 各条件のマッチング確認
+    let typeMatch = true;
+    let cityMatch = true;
+    let addressMatch = true;
+    let minPriceMatch = true;
+    let maxPriceMatch = true;
+    let statusMatch = true;
+    
+    // 種別の検索条件がある場合
+    if (type) {
+      typeMatch = property.type === type;
+    }
+    
+    // 行政区の検索条件がある場合
+    if (city) {
+      cityMatch = property.city === city;
+    }
+    
+    // 番地の検索条件がある場合
+    if (address) {
+      addressMatch = property.address && property.address.toLowerCase().includes(address);
+    }
+    
+    // 価格下限の検索条件がある場合
+    if (minPrice) {
+      minPriceMatch = property.price && Number(property.price) >= Number(minPrice);
+    }
+    
+    // 価格上限の検索条件がある場合
+    if (maxPrice) {
+      maxPriceMatch = property.price && Number(property.price) <= Number(maxPrice);
+    }
+    
+    // 販売状況の検索条件がある場合
+    if (status) {
+      statusMatch = property.status === status;
+    }
+    
+    // すべての条件に一致するかどうか
+    const allMatch = typeMatch && cityMatch && addressMatch && minPriceMatch && maxPriceMatch && statusMatch;
+    
+    // デバッグ用にコンソールに出力 (必要に応じてコメントアウト解除)
+    // console.log(`物件「${property.name}」(${property.city}):`, { typeMatch, cityMatch, addressMatch, minPriceMatch, maxPriceMatch, statusMatch, allMatch });
+    
+    return allMatch;
+  });
+  
+  console.log('検索後の物件数:', filteredProperties.length);
+  
+  // 検索結果の表示を更新
+  renderPropertyTable();
+};
     
     // すべて選択/解除
     document.getElementById('selectAll').onclick = function() {
