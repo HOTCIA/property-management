@@ -1,0 +1,588 @@
+<!DOCTYPE html> 
+<html lang="ja"> 
+<head> 
+<meta charset="UTF-8"> 
+<title>不動産物件管理システム</title> 
+<style> 
+body { font-family: sans-serif; background: #f9f9f9; padding: 1em; } 
+.tab { display: flex; margin-bottom: 1em; background: #ddd; border-radius: 6px; overflow: hidden; } 
+.tab button { flex: 1; padding: 1em; border: none; background: #ccc; font-weight: bold; cursor: pointer; transition: background 0.3s; } 
+.tab button.active { background: #2196F3; color: white; } 
+.content { display: none; } 
+.content.active { display: block; background: white; padding: 1em; border-radius: 6px; box-shadow: 0 0 8px rgba(0,0,0,0.1); } 
+.form-group { margin-bottom: 1em; display: flex; flex-direction: column; max-width: 400px; } 
+input, select, button { padding: 0.5em; font-size: 1em; margin-top: 0.3em; } 
+.highlight-button { background: #ff5722; color: white; border: none; padding: 0.6em 1em; font-size: 1em; cursor: pointer; border-radius: 4px; margin-top: 1em; } 
+.pagination { display: flex; justify-content: center; margin-top: 1em; gap: 0.5em; } 
+.pagination button { padding: 0.5em 1em; border: 1px solid #ccc; background: #f9f9f9; cursor: pointer; border-radius: 4px; } 
+.pagination button.active { background: #2196F3; color: white; border-color: #2196F3; } 
+.pagination button:hover:not(.active) { background: #e0e0e0; } 
+.pagination-info { text-align: center; margin-top: 1em; font-size: 0.9em; color: #666; } 
+/* テーブルレイアウトの改善 */ 
+table { width: 100%; border-collapse: collapse; margin-top: 1em; table-layout: fixed; } 
+th, td { border: 1px solid #ccc; padding: 0.5em; text-align: left; overflow: hidden; text-overflow: ellipsis; } 
+th { background: #f0f0f0; white-space: nowrap; font-size: 0.9em; padding: 0.6em 0.3em; } 
+.editable { cursor: text; border: 1px solid transparent; overflow: hidden; } 
+.editable:hover { border: 1px solid #2196F3; } 
+.editable:focus { outline: none; border: 1px solid #2196F3; background: #e3f2fd; } 
+.status-select, .type-select, .city-select, .media-select { width: 100%; padding: 0.3em; } 
+/* カラム幅の設定 */ 
+#propertyTable th:nth-child(1) { width: 30px; } /* チェックボックス */ 
+#propertyTable th:nth-child(2) { width: 80px; } /* 種別 */ 
+#propertyTable th:nth-child(3) { width: 120px; } /* 物件名 */ 
+#propertyTable th:nth-child(4) { width: 80px; } /* 行政区 */ 
+#propertyTable th:nth-child(5) { width: 120px; } /* 番地以下 */ 
+#propertyTable th:nth-child(6) { width: 60px; } /* 価格 */ 
+#propertyTable th:nth-child(7) { width: 45px; } /* 土地面積 */ 
+#propertyTable th:nth-child(8) { width: 45px; } /* 建物面積 */ 
+#propertyTable th:nth-child(9) { width: 70px; } /* 媒体 */ 
+#propertyTable th:nth-child(10) { width: 140px; } /* 業者名 */ 
+#propertyTable th:nth-child(11) { width: 80px; } /* 電話番号 */ 
+#propertyTable th:nth-child(12) { width: 35px; } /* PDF */ 
+#propertyTable th:nth-child(13) { width: 80px; } /* 販売状況 */ 
+#propertyTable th:nth-child(14) { width: 70px; } /* 登録日 */ 
+#propertyTable th:nth-child(15) { width: 70px; } /* 更新日 */ 
+/* ヘッダーの縮小と整列 */ 
+#propertyTable th { line-height: 1.2; font-weight: normal; vertical-align: bottom; } 
+/* テーブル内の文字サイズ調整 */ 
+#propertyTable td { font-size: 0.95em; white-space: normal; word-break: break-all; } 
+/* 日付関連のセル */ 
+#propertyTable th:nth-child(14), #propertyTable th:nth-child(15), #propertyTable td:nth-child(14), #propertyTable td:nth-child(15) { font-size: 0.85em; white-space: nowrap; } 
+/* レスポンシブ対応 */ 
+@media screen and (max-width: 1200px) { 
+  #propertyTable { display: block; overflow-x: auto; white-space: nowrap; } 
+} 
+/* 検索フォームとアクションボタンのレイアウト改善 */ 
+.search-form, .actions { display: flex; flex-wrap: wrap; gap: 0.5em; margin-bottom: 1em; align-items: center; } 
+.search-form select, .search-form input { min-width: 120px; max-width: 150px; margin-right: 0.5em; } 
+/* ローディングインジケーター */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3498db;
+  border-radius: 50%;
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+/* エラーメッセージ */
+.error-message {
+  color: #ff0000;
+  background-color: #ffeeee;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 10px 0;
+  border: 1px solid #ff0000;
+}
+/* 設定パネル */
+.settings-panel {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+}
+</style> 
+</head> 
+<body> 
+<div id="propertyManagerApp"> 
+  <!-- ローディングオーバーレイ -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- エラーメッセージ表示領域 -->
+  <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+  <div class="tab"> 
+    <button type="button" class="tabBtn active" data-tab="0">物件登録</button> 
+    <button type="button" class="tabBtn" data-tab="1">一覧・検索</button> 
+    <button type="button" class="tabBtn" data-tab="2">CSV管理</button> 
+    <button type="button" class="tabBtn" data-tab="3">設定</button>
+  </div> 
+
+  <div class="content active" id="tab0"> 
+    <form id="propertyForm"> 
+      <div class="form-group">種別 
+        <select name="type"> 
+          <option>土地</option><option>中古戸建</option><option>新築戸建</option> 
+        </select> 
+      </div> 
+      <div class="form-group">物件名<input name="name"></div> 
+      <div class="form-group">行政区 
+        <select name="city"> 
+          <option>流山市</option><option>柏市</option><option>松戸市</option><option>船橋市</option><option>鎌ヶ谷市</option> 
+        </select> 
+      </div> 
+      <div class="form-group">番地以下<input name="address_detail"></div> 
+      <div class="form-group">価格<input name="price"></div> 
+      <div class="form-group">土地面積<input name="land_area"></div> 
+      <div class="form-group">建物面積<input name="building_area"></div> 
+      <div class="form-group">媒体 
+        <select name="media"> 
+          <option>レインズ</option><option>at-home</option><option>スーモ</option><option>不動産ジャパン</option> 
+        </select> 
+      </div> 
+      <div class="form-group">業者名<input name="agency"></div> 
+      <div class="form-group">電話番号<input name="phone"></div> 
+      <div class="form-group">販売図面PDF<input type="file" name="pdf" id="pdfFile"></div> 
+      <div class="form-group">販売状況 
+        <select name="status"> 
+          <option>販売中</option><option>成約</option><option>売り止め</option> 
+        </select> 
+      </div> 
+      <button type="button" id="registerBtn" class="highlight-button">登録</button> 
+    </form> 
+  </div> 
+
+  <div class="content" id="tab1"> 
+    <div class="search-form"> 
+      <select id="searchType"><option value="">種別</option><option>土地</option><option>中古戸建</option><option>新築戸建</option></select> 
+      <select id="searchCity"><option value="">行政区</option><option>流山市</option><option>柏市</option><option>松戸市</option><option>船橋市</option><option>鎌ヶ谷市</option></select> 
+      <input id="searchAddressDetail" placeholder="番地以下"> 
+      <input id="searchMin" placeholder="価格下限"> 
+      <input id="searchMax" placeholder="価格上限"> 
+      <input id="searchLandMin" placeholder="土地面積下限"> 
+      <input id="searchLandMax" placeholder="土地面積上限"> 
+      <select id="searchMedia"><option value="">媒体</option><option>レインズ</option><option>at-home</option><option>スーモ</option><option>不動産ジャパン</option></select> 
+      <select id="searchStatus"><option value="">販売状況</option><option>販売中</option><option>成約</option><option>売り止め</option></select> 
+      <button type="button" class="highlight-button" id="searchBtn">検索</button> 
+    </div> 
+    <div class="actions"> 
+      <button type="button" id="statusHanbaiBtn">販売中</button> 
+      <button type="button" id="statusSeijakuBtn">成約</button> 
+      <button type="button" id="statusUridomeBtn">売り止め</button> 
+      <button type="button" id="deleteBtn">削除</button> 
+      <button type="button" id="exportCheckedBtn" class="highlight-button">チェック物件をCSV出力</button> 
+      <button type="button" id="exportHanbaiBtn" class="highlight-button">販売中物件CSV出力</button> 
+      <button type="button" id="exportSeijakuBtn" class="highlight-button">成約物件CSV出力</button> 
+      <button type="button" id="exportUridomeBtn" class="highlight-button">売り止め物件CSV出力</button> 
+    </div> 
+    <div class="pagination-info" id="paginationInfo">0件の物件が見つかりました</div> 
+    <table id="propertyTable"> 
+      <thead> 
+        <tr> 
+          <th><input type="checkbox" id="toggleAllCheckbox"></th> 
+          <th>種別</th> 
+          <th>物件名</th> 
+          <th>行政区</th> 
+          <th>番地以下</th> 
+          <th>価格</th> 
+          <th>土地面積</th> 
+          <th>建物面積</th> 
+          <th>媒体</th> 
+          <th>業者名</th> 
+          <th>電話番号</th> 
+          <th>PDF</th> 
+          <th>販売状況</th> 
+          <th>登録日</th> 
+          <th>更新日</th> 
+        </tr> 
+      </thead> 
+      <tbody></tbody> 
+    </table> 
+    <div class="pagination" id="pagination"></div> 
+  </div> 
+
+  <div class="content" id="tab2"> 
+    <button type="button" id="exportAllBtn">登録物件CSV出力</button> 
+    <button type="button" id="downloadTemplateBtn">CSVひな形DL</button> 
+    <input type="file" accept=".csv" id="csvFileInput"> 
+    <button type="button" id="importCSVBtn">CSV取込</button> 
+    <button type="button" id="exportCSVBtn">CSV出力</button> 
+  </div>
+
+  <div class="content" id="tab3">
+    <div class="settings-panel">
+      <h3>データ同期設定</h3>
+      <p>複数端末で同じデータを共有するための設定です。</p>
+      <div class="form-group">
+        <label for="jsonBinApiKey">JSONBin.io APIキー</label>
+        <input type="text" id="jsonBinApiKey" placeholder="APIキーを入力してください">
+      </div>
+      <div class="form-group">
+        <label for="jsonBinBinId">Bin ID (空欄の場合は新規作成されます)</label>
+        <input type="text" id="jsonBinBinId" placeholder="既存のBin IDがあれば入力してください">
+      </div>
+      <div class="actions">
+        <button type="button" id="saveSettingsBtn" class="highlight-button">設定を保存</button>
+        <button type="button" id="testConnectionBtn">接続テスト</button>
+        <button type="button" id="createNewBinBtn">新規Bin作成</button>
+        <button type="button" id="syncDataBtn">データ同期</button>
+      </div>
+      <div id="connectionStatus" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// アプリケーションコードをここに配置
+document.addEventListener('DOMContentLoaded', function() {
+  // グローバル変数
+  let filteredData = []; // 検索結果データ
+  let currentPage = 1; // 現在のページ
+  const itemsPerPage = 100; // 1ページあたりの表示件数
+  let isDataModified = false; // データ変更フラグ
+
+  // JSONBin.io用の設定
+  const jsonBinConfig = {
+    apiKey: localStorage.getItem('jsonBinApiKey') || '',
+    binId: localStorage.getItem('jsonBinBinId') || '',
+    baseUrl: 'https://api.jsonbin.io/v3/b'
+  };
+
+  // タブ切り替え機能
+  const tabButtons = document.querySelectorAll('.tabBtn');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const tabIndex = parseInt(this.getAttribute('data-tab'));
+      switchTab(tabIndex);
+    });
+  });
+
+  function switchTab(index) {
+    const tabs = document.querySelectorAll('.tabBtn');
+    const contents = document.querySelectorAll('.content');
+    for (let i = 0; i < tabs.length; i++) {
+      if (i === index) {
+        tabs[i].classList.add('active');
+        contents[i].classList.add('active');
+      } else {
+        tabs[i].classList.remove('active');
+        contents[i].classList.remove('active');
+      }
+    }
+
+    // 設定タブが表示された場合は設定値を読み込む
+    if (index === 3) {
+      loadSettings();
+    }
+    
+    // 一覧・検索タブが表示された場合はデータを読み込む
+    if (index === 1) {
+      searchProperties();
+    }
+  }
+
+  // 日付フォーマット関数
+  function formatDate(date) {
+    if (!date) return '';
+    try {
+      const d = new Date(date);
+      // 無効な日付の場合
+      if (isNaN(d.getTime())) {
+        return date; // 元の値をそのまま返す
+      }
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}/${month}/${day} ${hours}:${minutes}`;
+    } catch (e) {
+      console.error('日付フォーマットエラー:', e);
+      return date; // エラーが発生した場合は元の値を返す
+    }
+  }
+
+  // 現在の日時を取得
+  function getCurrentDateTime() {
+    return new Date().toISOString();
+  }
+
+  // ローディング表示/非表示関数
+  function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+
+  // エラーメッセージ表示関数
+  function showError(message) {
+    const errorElement = document.getElementById('errorMessage');
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    setTimeout(() => {
+      errorElement.style.display = 'none';
+    }, 5000); // 5秒後に消える
+  }
+
+  // 設定の読み込みと表示
+  function loadSettings() {
+    document.getElementById('jsonBinApiKey').value = jsonBinConfig.apiKey;
+    document.getElementById('jsonBinBinId').value = jsonBinConfig.binId;
+  }
+
+  // 設定保存
+  document.getElementById('saveSettingsBtn').addEventListener('click', function() {
+    const apiKey = document.getElementById('jsonBinApiKey').value.trim();
+    const binId = document.getElementById('jsonBinBinId').value.trim();
+    
+    jsonBinConfig.apiKey = apiKey;
+    jsonBinConfig.binId = binId;
+    
+    localStorage.setItem('jsonBinApiKey', apiKey);
+    localStorage.setItem('jsonBinBinId', binId);
+    
+    alert('設定を保存しました');
+  });
+
+  // 接続テスト
+  document.getElementById('testConnectionBtn').addEventListener('click', async function() {
+    const statusElement = document.getElementById('connectionStatus');
+    statusElement.textContent = '接続テスト中...';
+    statusElement.style.color = '#333';
+    
+    if (!jsonBinConfig.apiKey) {
+      statusElement.textContent = 'APIキーが設定されていません。';
+      statusElement.style.color = 'red';
+      return;
+    }
+    
+    if (!jsonBinConfig.binId) {
+      statusElement.textContent = 'Bin IDが設定されていません。新規作成するか、既存のBin IDを入力してください。';
+      statusElement.style.color = 'orange';
+      return;
+    }
+    
+    try {
+      showLoading();
+      const response = await fetch(`${jsonBinConfig.baseUrl}/${jsonBinConfig.binId}`, {
+        method: 'GET',
+        headers: {
+          'X-Master-Key': jsonBinConfig.apiKey
+        }
+      });
+      
+      if (response.ok) {
+        statusElement.textContent = '接続成功！データを読み込めます。';
+        statusElement.style.color = 'green';
+      } else {
+        statusElement.textContent = `接続エラー: ${response.status} ${response.statusText}`;
+        statusElement.style.color = 'red';
+      }
+    } catch (error) {
+      statusElement.textContent = `接続エラー: ${error.message}`;
+      statusElement.style.color = 'red';
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // 新規Bin作成
+  document.getElementById('createNewBinBtn').addEventListener('click', async function() {
+    const statusElement = document.getElementById('connectionStatus');
+    
+    if (!jsonBinConfig.apiKey) {
+      statusElement.textContent = 'APIキーが設定されていません。';
+      statusElement.style.color = 'red';
+      return;
+    }
+    
+    try {
+      showLoading();
+      const initialData = { properties: [] };
+      
+      const response = await fetch(`${jsonBinConfig.baseUrl}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': jsonBinConfig.apiKey,
+          'X-Bin-Private': 'false'
+        },
+        body: JSON.stringify(initialData)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const newBinId = data.metadata.id;
+        
+        jsonBinConfig.binId = newBinId;
+        document.getElementById('jsonBinBinId').value = newBinId;
+        localStorage.setItem('jsonBinBinId', newBinId);
+        
+        statusElement.textContent = `新規Binを作成しました。Bin ID: ${newBinId}`;
+        statusElement.style.color = 'green';
+        
+        alert(`新規Binを作成しました。このIDを他の端末でも使用することで、データを共有できます。\nBin ID: ${newBinId}`);
+      } else {
+        statusElement.textContent = `Bin作成エラー: ${response.status} ${response.statusText}`;
+        statusElement.style.color = 'red';
+      }
+    } catch (error) {
+      statusElement.textContent = `Bin作成エラー: ${error.message}`;
+      statusElement.style.color = 'red';
+    } finally {
+      hideLoading();
+    }
+  });
+
+  // データ同期
+  document.getElementById('syncDataBtn').addEventListener('click', async function() {
+    if (isDataModified) {
+      if (confirm('ローカルのデータが変更されています。JSONBin.ioに保存しますか？')) {
+        await saveDataToJSONBin();
+      }
+    } else {
+      if (confirm('JSONBin.ioからデータを読み込みますか？現在のデータは上書きされます。')) {
+        await loadDataFromJSONBin();
+        alert('データを同期しました');
+        searchProperties(); // テーブルを更新
+      }
+    }
+  });
+
+  // JSONBin.ioからデータを読み込む
+  async function loadDataFromJSONBin() {
+    if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
+      showError('APIキーとBin IDを設定してください');
+      return null;
+    }
+    
+    try {
+      showLoading();
+      const response = await fetch(`${jsonBinConfig.baseUrl}/${jsonBinConfig.binId}`, {
+        method: 'GET',
+        headers: {
+          'X-Master-Key': jsonBinConfig.apiKey
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`JSONBin.ioからの読み込みに失敗しました: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const properties = data.record.properties || [];
+      
+      // ローカルストレージに保存
+      localStorage.setItem('properties', JSON.stringify(properties));
+      isDataModified = false;
+      
+      return properties;
+    } catch (error) {
+      showError(`データ読み込みエラー: ${error.message}`);
+      console.error('JSONBin.io読み込みエラー:', error);
+      return null;
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // JSONBin.ioにデータを保存する
+  async function saveDataToJSONBin() {
+    if (!jsonBinConfig.apiKey || !jsonBinConfig.binId) {
+      showError('APIキーとBin IDを設定してください');
+      return false;
+    }
+    
+    try {
+      showLoading();
+      const properties = JSON.parse(localStorage.getItem('properties') || '[]');
+      const dataToSave = { properties: properties };
+      
+      const response = await fetch(`${jsonBinConfig.baseUrl}/${jsonBinConfig.binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': jsonBinConfig.apiKey
+        },
+        body: JSON.stringify(dataToSave)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`JSONBin.ioへの保存に失敗しました: ${response.status} ${response.statusText}`);
+      }
+      
+      isDataModified = false;
+      return true;
+    } catch (error) {
+      showError(`データ保存エラー: ${error.message}`);
+      console.error('JSONBin.io保存エラー:', error);
+      return false;
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // 物件登録機能
+  document.getElementById('registerBtn').addEventListener('click', function() {
+    registerProperty();
+  });
+
+  async function registerProperty() {
+    try {
+      const form = document.getElementById('propertyForm');
+      const formElements = form.elements;
+      let data = JSON.parse(localStorage.getItem('properties') || '[]');
+      
+      // フォームデータの取得
+      let newItem = {};
+      for (let i = 0; i < formElements.length; i++) {
+        const element = formElements[i];
+        if (element.tagName !== 'BUTTON' && element.name) {
+          if (element.type === 'file') continue; // ファイル入力は別処理
+          newItem[element.name] = element.value;
+        }
+      }
+      
+      // 登録日・更新日を追加
+      const now = getCurrentDateTime();
+      newItem.created_at = now;
+      newItem.updated_at = now;
+      
+      // PDF処理
+      const fileInput = document.getElementById('pdfFile');
+      if (fileInput.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          newItem.pdf = reader.result;
+          data.push(newItem);
+          localStorage.setItem('properties', JSON.stringify(data));
+          isDataModified = true;
+          
+          // JSONBin.ioに自動保存（設定されている場合）
+          if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
+            const saved = await saveDataToJSONBin();
+            if (saved) {
+              alert('登録しました（JSONBin.ioにも保存されました）');
+            } else {
+              alert('登録しましたが、JSONBin.ioへの保存に失敗しました');
+            }
+          } else {
+            alert('登録しました（ローカルのみ保存）');
+          }
+          
+          form.reset();
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        newItem.pdf = '';
+        data.push(newItem);
+        localStorage.setItem('properties', JSON.stringify(data));
+        isDataModified = true;
+        
+        // JSONBin.ioに自動保存（設定されている場合）
+        if (jsonBinConfig.apiKey && jsonBinConfig.binId) {
+          const saved = await saveDataToJSONBin();
+          if (saved) {
+            alert('登録しました（JSONBin.ioにも保存されました）');
+          } else {
+            alert('登録しましたが、JSONBin.ioへの保存に失敗しました');
+          }
